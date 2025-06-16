@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: crypto-predictor
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn predictor_api:app
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: 8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A
+      - key: TELEGRAM_CHAT_ID
+        value: 854634209
+    plan: free
