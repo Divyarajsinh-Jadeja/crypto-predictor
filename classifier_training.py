@@ -1,6 +1,7 @@
 # classifier_training.py
 import pandas as pd
 import numpy as np
+import os  # Add this import
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -31,6 +32,8 @@ def train_classifier(symbol="BTCUSDT"):
     acc = accuracy_score(y_test, preds)
     print(f"{symbol} Classifier Accuracy:", acc)
 
+    # Create models directory if it doesn't exist
+    os.makedirs("models", exist_ok=True)
     joblib.dump(model, f"models/{symbol}_classifier.pkl")
 
 if __name__ == "__main__":
