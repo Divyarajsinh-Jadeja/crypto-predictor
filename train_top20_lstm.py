@@ -1,5 +1,6 @@
 from train_model import fetch_klines, add_features, train_classifier
 from train_model import train_lstm  # assuming this is your lstm training module
+from train_model import train_prophet
 
 coins = {
     "bitcoin": "BTCUSDT",
