@@ -6,25 +6,11 @@ from threading import Timer
 from dotenv import load_dotenv
 import csv
 
+from gchat_bot import send_chat_message
+
 load_dotenv()
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A"
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "854634209"
-
 PREDICTION_LOG_FILE = "prediction_log.csv"
-
-
-def send_telegram_message(message):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "Markdown"
-        }
-        requests.post(url, data=payload)
-    except Exception as e:
-        print("❌ Telegram send error:", e)
 
 def log_prediction(symbol, signal, price):
     file_exists = os.path.exists(PREDICTION_LOG_FILE)
@@ -81,7 +67,7 @@ def evaluate_accuracy(N=20, lookahead_minutes=60):
         accuracy = 100 * sum(results) / len(results)
         message = f"📊 *Accuracy Report*Checked: {len(results)} predictions\nAccuracy: {accuracy:.2f}% over last {N} signals"
         print(message)
-        send_telegram_message(message)
+        send_chat_message(message)
     else:
         print("⚠️ Not enough completed predictions to evaluate accuracy.")
 

@@ -5,8 +5,8 @@ from datetime import datetime
 
 load_dotenv()
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A"
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "854634209"
+# TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A"
+# TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "854634209"
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5050")
 
 last_known_signals = {}
@@ -342,44 +342,12 @@ def send_all_predictions():
         print(f"❌ {error_msg}")
 
 
-def test_telegram_connection():
-    """Test Telegram bot connection"""
-    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "your_default_token":
-        print("❌ TELEGRAM_TOKEN not set")
-        return False
-
-    if not TELEGRAM_CHAT_ID or TELEGRAM_CHAT_ID == "your_default_chat_id":
-        print("❌ TELEGRAM_CHAT_ID not set")
-        return False
-
-    try:
-        # Test bot info
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
-        response = requests.get(url, timeout=10)
-
-        if response.ok:
-            bot_info = response.json()
-            print(f"✅ Bot connected: {bot_info['result']['first_name']}")
-
-            # Send test message
-            test_message = f"🤖 *Bot Test Message*\n\nConnection successful{'!'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            return send_chat_message(test_message)
-        else:
-            print(f"❌ Bot connection failed: {response.text}")
-            return False
-
-    except Exception as e:
-        print(f"❌ Telegram test failed: {e}")
-        return False
-
-
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 1:
         if sys.argv[1] == "test":
             print("🧪 Testing Telegram connection...")
-            test_telegram_connection()
         elif sys.argv[1] == "signal":
             print("📡 Fetching predictions for signal change alerts...")
             try:
