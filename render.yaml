@@ -1,12 +1,13 @@
 services:
   - type: web
     name: crypto-predictor
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn predictor_api:app
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python predictor_api.py"
     envVars:
-      - key: TELEGRAM_TOKEN
-        value: 8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A
-      - key: TELEGRAM_CHAT_ID
-        value: 854634209
-    plan: free
+      - key: GOOGLE_CHAT_WEBHOOK_URL
+        value: https://chat.googleapis.com/your-webhook
+      - key: API_BASE_URL
+        value: https://crypto-api.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.10
+    runtime: python
