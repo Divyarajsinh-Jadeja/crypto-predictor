@@ -10,3 +10,5 @@ pymongo
 dnspython
 textblob
 feedparser
+xgboost
+python-dotenv

@@ -267,4 +267,5 @@ def run_prediction(symbol, live_price=None):
 if __name__ == "__main__":
     print("🚀 Starting Crypto Prediction API...")
     print(f"📊 Supporting {len(SYMBOL_MAP)} cryptocurrencies")
-    app.run(host="0.0.0.0", port=5050, debug=True)
+    port = int(os.environ.get("PORT", 5050))
+    app.run(host="0.0.0.0", port=port, debug=False)
