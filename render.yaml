@@ -1,7 +1,7 @@
 services:
   - type: web
     name: crypto-predictor
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "python predictor_api.py"
     envVars:
       - key: GOOGLE_CHAT_WEBHOOK_URL
