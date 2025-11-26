@@ -7,7 +7,7 @@ load_dotenv()
 
 # TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A"
 # TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "854634209"
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5050")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://crypto-predictor-akpl.onrender.com")
 
 last_known_signals = {}
 
@@ -323,8 +323,11 @@ def send_all_predictions():
         if error_predictions:
             message += "❌ *Failed Predictions:*\n"
             for coin_data in error_predictions:
-                coin = coin_data['coin'].replace("-", " ").title()
-                error = coin_data["error"][:100]  # Truncate long errors
+                # Get coin name from symbol or use symbol directly
+                symbol = coin_data.get('symbol', '').upper()
+                coin_name = COIN_ID_MAP.get(symbol, symbol)
+                coin = coin_name.replace("-", " ").title() if coin_name else "Unknown"
+                error = coin_data.get("error", "Unknown error")[:100]  # Truncate long errors
                 message += f"• {coin}: {error}\n"
 
         # Add footer

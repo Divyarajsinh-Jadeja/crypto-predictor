@@ -188,6 +188,23 @@ def predict():
     return jsonify(result)
 
 
+@app.route("/send-to-chat", methods=["POST", "GET"])
+def send_to_chat():
+    """Send all predictions to Google Chat"""
+    try:
+        from gchat_bot import send_all_predictions
+        send_all_predictions()
+        return jsonify({
+            "status": "success",
+            "message": "Predictions sent to Google Chat successfully"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to send predictions: {str(e)}"
+        }), 500
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "ok", "message": "API is live"}), 200
@@ -212,11 +229,11 @@ def run_prediction(symbol, live_price=None):
     try:
         has_required, optional_models = check_model_files(symbol)
         if not has_required:
-            return {"error": "Required model files not found"}
+            return {"symbol": symbol, "error": "Required model files not found"}
 
         df = fetch_klines(symbol)
         if df is None or len(df) < 60:
-            return {"error": "Insufficient data"}
+            return {"symbol": symbol, "error": "Insufficient data"}
 
         df = add_features(df)
         current = float(df["close"].iloc[-1])
@@ -261,7 +278,7 @@ def run_prediction(symbol, live_price=None):
 
     except Exception as e:
         print(f"❌ run_prediction failed for {symbol}: {e}")
-        return {"error": str(e)}
+        return {"symbol": symbol, "error": str(e)}
 
 
 if __name__ == "__main__":
