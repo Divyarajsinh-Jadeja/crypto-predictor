@@ -6,6 +6,11 @@ from flask import Flask, jsonify, request
 import joblib
 import numpy as np
 import pandas as pd
+
+# Suppress TensorFlow warnings and CPU instruction messages
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 from tensorflow.keras.models import load_model
 from train_model import add_features, compute_confidence, fetch_klines
 import warnings
