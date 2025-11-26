@@ -4,40 +4,31 @@ import os
 from datetime import datetime, timedelta
 from threading import Timer
 from dotenv import load_dotenv
-import csv
 
 from gchat_bot import send_chat_message
+from db_manager import get_recent_predictions
 
 load_dotenv()
 
-PREDICTION_LOG_FILE = "prediction_log.csv"
-
-def log_prediction(symbol, signal, price):
-    file_exists = os.path.exists(PREDICTION_LOG_FILE)
-    write_header = not file_exists or os.path.getsize(PREDICTION_LOG_FILE) == 0
-
-    with open(PREDICTION_LOG_FILE, mode="a", newline="") as f:
-        writer = csv.writer(f)
-        if write_header:
-            writer.writerow(["timestamp", "symbol", "signal", "predicted_price"])
-        writer.writerow([
-            datetime.utcnow().isoformat(),
-            symbol.upper(),
-            signal.capitalize(),
-            round(price, 8)
-        ])
-
-
-
 def evaluate_accuracy(N=20, lookahead_minutes=60):
     try:
-        df = pd.read_csv(PREDICTION_LOG_FILE)
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce', infer_datetime_format=True)
+        # Fetch from MongoDB
+        predictions = get_recent_predictions(limit=N*2) # Fetch a bit more to ensure we have enough
+        if not predictions:
+            print("⚠️ No predictions found in database.")
+            return
+
+        df = pd.DataFrame(predictions)
+        # Ensure timestamp is datetime
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
     except Exception as e:
         print("❌ Failed to read prediction log:", e)
         return
 
     results = []
+
+    # Sort by timestamp ascending for processing
+    df = df.sort_values("timestamp")
 
     for _, row in df.tail(N).iterrows():
         symbol = row["symbol"]
@@ -65,7 +56,7 @@ def evaluate_accuracy(N=20, lookahead_minutes=60):
 
     if results:
         accuracy = 100 * sum(results) / len(results)
-        message = f"📊 *Accuracy Report*Checked: {len(results)} predictions\nAccuracy: {accuracy:.2f}% over last {N} signals"
+        message = f"📊 *Accuracy Report*\nChecked: {len(results)} predictions\nAccuracy: {accuracy:.2f}% over last {N} signals"
         print(message)
         send_chat_message(message)
     else:
@@ -76,14 +67,7 @@ def periodic_accuracy_check():
     evaluate_accuracy(N=20, lookahead_minutes=60)
     Timer(3600, periodic_accuracy_check).start()  # run every hour
 
-def ensure_log_file():
-    if not os.path.exists(PREDICTION_LOG_FILE):
-        with open(PREDICTION_LOG_FILE, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["timestamp", "symbol", "signal", "predicted_price"])
-
 
 if __name__ == "__main__":
-    ensure_log_file()
-    print("📈 Running hourly prediction accuracy monitor...")
+    print("📈 Running hourly prediction accuracy monitor (MongoDB)...")
     periodic_accuracy_check()

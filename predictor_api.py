@@ -9,7 +9,8 @@ import pandas as pd
 from tensorflow.keras.models import load_model
 from train_model import add_features, compute_confidence, fetch_klines
 import warnings
-from accuracy_tracker import log_prediction
+from db_manager import log_prediction_to_db
+from sentiment_analyzer import get_crypto_sentiment, adjust_confidence_with_sentiment
 
 warnings.filterwarnings('ignore')
 
@@ -225,9 +226,20 @@ def run_prediction(symbol, live_price=None):
 
         signal = "Buy" if final_pred > current else "Sell"
         confidence = compute_confidence(current, final_pred)
+        
+        # ✅ Sentiment Analysis Integration
+        coin_name = COIN_ID_MAP.get(symbol, "bitcoin")
+        sentiment_score = get_crypto_sentiment(coin_name)
+        final_confidence = adjust_confidence_with_sentiment(confidence, sentiment_score)
 
-        # ✅ Log prediction for accuracy tracking
-        log_prediction(symbol=symbol, signal=signal, price=final_pred)
+        # ✅ Log prediction to MongoDB
+        log_prediction_to_db(
+            symbol=symbol, 
+            signal=signal, 
+            price=final_pred, 
+            confidence=final_confidence,
+            success_chance=classifier_prob
+        )
 
         return {
             "symbol": symbol,
@@ -236,7 +248,8 @@ def run_prediction(symbol, live_price=None):
             "prophet_prediction": prophet_pred,
             "final_prediction": final_pred,
             "signal": signal,
-            "confidence": confidence,
+            "confidence": final_confidence,
+            "sentiment_score": sentiment_score,
             "success_chance": classifier_prob,
             "timestamp": pd.Timestamp.now().isoformat()
         }
