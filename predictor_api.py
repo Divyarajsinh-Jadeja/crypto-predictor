@@ -164,10 +164,42 @@ def get_classifier_prediction(df, symbol):
 
 @app.route("/predict_all_lstm", methods=["GET"])
 def predict_all_lstm():
+    """Get predictions for all cryptocurrencies"""
     results = []
-    for coin, symbol in SYMBOL_MAP.items():
+    coins = list(SYMBOL_MAP.items())
+    total = len(coins)
+    
+    for idx, (coin, symbol) in enumerate(coins, 1):
+        try:
+            print(f"📊 Processing {coin} ({idx}/{total})...")
+            result = run_prediction(symbol)
+            results.append(result)
+        except Exception as e:
+            print(f"❌ Error processing {coin}: {e}")
+            results.append({"symbol": symbol, "error": str(e)})
+    
+    return jsonify(results)
+
+
+@app.route("/predict_batch", methods=["GET"])
+def predict_batch():
+    """Get predictions for a batch of coins (to avoid timeout)"""
+    coins_param = request.args.get("coins", "")
+    if not coins_param:
+        return jsonify({"error": "Please provide coins parameter (comma-separated)"}), 400
+    
+    coins_list = [c.strip().lower() for c in coins_param.split(",")]
+    results = []
+    
+    for coin in coins_list:
+        if coin not in SYMBOL_MAP:
+            results.append({"error": f"Unsupported coin: {coin}"})
+            continue
+        
+        symbol = SYMBOL_MAP[coin]
         result = run_prediction(symbol)
         results.append(result)
+    
     return jsonify(results)
 
 

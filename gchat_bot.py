@@ -248,6 +248,19 @@ def send_chat_message(message):
         return False
 
 
+def fetch_predictions_batch(coins_batch):
+    """Fetch predictions for a batch of coins"""
+    coins_str = ",".join(coins_batch)
+    url = f"{API_BASE_URL}/predict_batch?coins={coins_str}"
+    try:
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"❌ Batch fetch error: {e}")
+        return [{"error": str(e), "symbol": coin} for coin in coins_batch]
+
+
 def send_all_predictions():
     """Fetch and send all crypto predictions via Telegram"""
     try:
@@ -261,15 +274,61 @@ def send_all_predictions():
             send_chat_message(f"⚠️ API is not responding: {str(e)}")
             return
 
-        # Fetch predictions
+        # Try fetching all at once first, fallback to batches if timeout
         predictions_url = f"{API_BASE_URL}/predict_all_lstm"
         print(f"📡 Fetching predictions from {predictions_url}")
 
-        response = requests.get(predictions_url, timeout=120)  # Increased timeout
-        response.raise_for_status()
-
-        data = response.json()
-        predictions = data.get("predictions", data) if isinstance(data, dict) else data
+        predictions = None
+        max_retries = 2
+        retry_delay = 30  # seconds
+        
+        # Try fetching all predictions at once
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 Attempt {attempt + 1}/{max_retries}...")
+                # Increased timeout to 300 seconds (5 minutes) for all 20 coins
+                response = requests.get(predictions_url, timeout=300)
+                response.raise_for_status()
+                data = response.json()
+                predictions = data.get("predictions", data) if isinstance(data, dict) else data
+                print(f"✅ Successfully fetched {len(predictions)} predictions")
+                break  # Success, exit retry loop
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (attempt + 1)
+                    print(f"⏳ Timeout on attempt {attempt + 1}. Retrying in {wait_time} seconds...")
+                    send_chat_message(f"⏳ API request timed out. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    print("⚠️ All-at-once fetch timed out. Falling back to batch mode...")
+                    send_chat_message("⏳ Fetching predictions in batches to avoid timeout...")
+                    # Fallback to batch mode
+                    predictions = []
+                    all_coins = list(SYMBOL_MAP.keys())
+                    batch_size = 5  # Process 5 coins at a time
+                    
+                    for i in range(0, len(all_coins), batch_size):
+                        batch = all_coins[i:i + batch_size]
+                        print(f"📦 Fetching batch {i//batch_size + 1} ({len(batch)} coins)...")
+                        batch_results = fetch_predictions_batch(batch)
+                        predictions.extend(batch_results)
+                        import time
+                        time.sleep(2)  # Small delay between batches
+                    
+                    print(f"✅ Fetched {len(predictions)} predictions in batches")
+                    break
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (attempt + 1)
+                    print(f"⚠️ Request failed: {e}. Retrying in {wait_time} seconds...")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    raise  # Last attempt failed
+        
+        if predictions is None:
+            raise Exception("Failed to fetch predictions after all retries")
 
         if not predictions:
             send_chat_message("⚠️ No predictions available.")
