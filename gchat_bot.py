@@ -5,8 +5,6 @@ from datetime import datetime
 
 load_dotenv()
 
-# TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8021958251:AAEQMwfChSEZ3UXxsleI4A1dIquLhY20E0A"
-# TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "854634209"
 API_BASE_URL = os.getenv("API_BASE_URL", "https://crypto-predictor-akpl.onrender.com")
 
 last_known_signals = {}
@@ -83,17 +81,6 @@ def get_usd_inr_rate():
 
     print("⚠️ All exchange rate APIs failed, using fallback rate")
     return 83.50  # Updated fallback rate
-
-
-# def escape_md(text):
-#     """Escape special characters for Telegram MarkdownV2"""
-#     if text is None:
-#         return "N/A"
-#
-#     # Characters that need escaping in MarkdownV2
-#     to_escape = r'_*[]()~`>#+-=|{}.!'
-#     escaped = re.sub(f'([{re.escape(to_escape)}])', r'\\\1', str(text))
-#     return escaped
 
 
 def format_number(number, decimals=4):
@@ -223,14 +210,13 @@ def format_prediction(coin_data, usd_to_inr):
         return f"⚠️ Error formatting {coin_name}: {error_msg}"
 
 
-GOOGLE_CHAT_WEBHOOK_URL = os.getenv(
-    "GOOGLE_CHAT_WEBHOOK_URL") or "https://chat.googleapis.com/v1/spaces/AAQAeDW1n5I/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=bx4d3xHJi_rB2BWHQRdD_vWOuRexklVvOUL7Ywd0108"
+GOOGLE_CHAT_WEBHOOK_URL = os.getenv("GOOGLE_CHAT_WEBHOOK_URL")
 
 
 def send_chat_message(message):
     """Send message to Google Chat via webhook"""
-    if not GOOGLE_CHAT_WEBHOOK_URL.startswith("https://"):
-        print("❌ Invalid Google Chat Webhook URL")
+    if not GOOGLE_CHAT_WEBHOOK_URL or not GOOGLE_CHAT_WEBHOOK_URL.startswith("https://"):
+        print("❌ Invalid or missing Google Chat Webhook URL")
         return False
 
     payload = {"text": message}

@@ -1,5 +1,3 @@
-# ✅ Updated predictor_api.py with improvements and bug fixes
-
 import os
 import pickle
 from flask import Flask, jsonify, request
