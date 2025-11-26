@@ -1,1 +1,8 @@
-/.env
+.env
+venv/
+tf-env/
+google-cloud-sdk/
+*.tar.gz
+__pycache__/
+.idea/
+.DS_Store

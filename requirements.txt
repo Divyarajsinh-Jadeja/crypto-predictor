@@ -1,8 +1,12 @@
 flask
 pandas
 numpy
-tensorflow==2.12.0
+tensorflow
 scikit-learn
 joblib
 requests
 prophet
+pymongo
+dnspython
+textblob
+feedparser
