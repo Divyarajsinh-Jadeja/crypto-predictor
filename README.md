@@ -144,5 +144,21 @@ Shows the status of trained models for each coin.
 3.  **Google Chat Errors**: Verify your `GOOGLE_CHAT_WEBHOOK_URL` in the `.env` file.
 4.  **MongoDB Errors**: Ensure `MONGO_URI` is correct and your IP is whitelisted if using a cloud database.
 
+## 🤖 Free Automation Setup
+
+This project includes **GitHub Actions workflows** for complete automation:
+
+- 🔄 **Auto-training**: Retrain models weekly with fresh data
+- 📊 **Auto-predictions**: Send updates to Google Chat every 6 hours
+- 💚 **Keep-alive**: Prevent your Render service from sleeping
+
+**👉 See [AUTOMATION.md](AUTOMATION.md) for complete setup instructions**
+
+Quick start:
+1. Push code to GitHub
+2. Add secrets: `GOOGLE_CHAT_WEBHOOK_URL` and `API_BASE_URL`
+3. Enable GitHub Actions
+4. Done! Everything runs automatically for **$0/month**
+
 ## Disclaimer
 This system is for educational and research purposes only. Cryptocurrency trading involves significant risk. Always conduct your own research before making investment decisions.
