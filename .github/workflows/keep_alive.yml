@@ -1,0 +1,21 @@
+name: Health Check & Keep Render Alive
+
+on:
+    schedule:
+        # Ping the API every 10 minutes to prevent Render from sleeping
+        - cron: "*/10 * * * *"
+    workflow_dispatch:
+
+jobs:
+    health-check:
+        runs-on: ubuntu-latest
+        timeout-minutes: 2
+
+        steps:
+            - name: Ping Health Endpoint
+              run: |
+                  curl -f -s -o /dev/null -w "Status: %{http_code}\n" ${{ secrets.API_BASE_URL }}/health || echo "⚠️ API is down or sleeping"
+
+            - name: Ping Model Status
+              run: |
+                  curl -f -s ${{ secrets.API_BASE_URL }}/models/status | head -c 200
