@@ -1,41 +1,41 @@
 name: Send Crypto Predictions to Google Chat
 
 on:
-    schedule:
-        # Send predictions 4 times daily (every 6 hours)
-        - cron: "0 0,6,12,18 * * *" # 12 AM, 6 AM, 12 PM, 6 PM UTC
-    workflow_dispatch: # Allow manual trigger
+  schedule:
+    # Send predictions every hour
+    - cron: "0 * * * *" # Every hour at the start of the hour
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
-    send-predictions:
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
+  send-predictions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.10"
-                  cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
 
-            - name: Install dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install requests python-dotenv
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
 
-            - name: Send Predictions to Google Chat
-              run: python gchat_bot.py
-              env:
-                  GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-                  API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      - name: Send Predictions to Google Chat
+        run: python gchat_bot.py
+        env:
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
 
-            - name: Log Success
-              if: success()
-              run: echo "✅ Successfully sent predictions at $(date)"
+      - name: Log Success
+        if: success()
+        run: echo "✅ Successfully sent predictions at $(date)"
 
-            - name: Log Failure
-              if: failure()
-              run: echo "❌ Failed to send predictions at $(date)"
+      - name: Log Failure
+        if: failure()
+        run: echo "❌ Failed to send predictions at $(date)"
