@@ -9,7 +9,7 @@ on:
 jobs:
   send-predictions:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15 # Increased to handle Render wake-up (~3-5 min)
 
     steps:
       - name: Checkout code

@@ -250,15 +250,42 @@ def fetch_predictions_batch(coins_batch):
 def send_all_predictions():
     """Fetch and send all crypto predictions via Telegram"""
     try:
-        # Check API health first
+        # Check API health first - with extended timeout for Render wake-up
         health_url = f"{API_BASE_URL}/health"
-        try:
-            health_response = requests.get(health_url, timeout=10)
-            if not health_response.ok:
-                raise Exception(f"API health check failed: {health_response.status_code}")
-        except Exception as e:
-            send_chat_message(f"⚠️ API is not responding: {str(e)}")
-            return
+        print(f"🔍 Checking API health at {health_url}...")
+        
+        # Try health check with retries (Render can take 30-60s to wake up)
+        for attempt in range(3):
+            try:
+                print(f"  Attempt {attempt + 1}/3...")
+                health_response = requests.get(health_url, timeout=90)  # 90 second timeout
+                if health_response.ok:
+                    print(f"✅ API is awake and healthy!")
+                    break
+                else:
+                    print(f"⚠️ Health check returned status: {health_response.status_code}")
+                    if attempt < 2:
+                        print(f"  Waiting 30 seconds before retry...")
+                        import time
+                        time.sleep(30)
+            except requests.exceptions.Timeout:
+                if attempt < 2:
+                    print(f"⏳ Timeout on attempt {attempt + 1}. API might be waking up...")
+                    print(f"  Waiting 45 seconds before retry...")
+                    import time
+                    time.sleep(45)
+                else:
+                    send_chat_message(f"⚠️ API did not wake up after 3 attempts. Render might be experiencing issues.")
+                    return
+            except Exception as e:
+                if attempt < 2:
+                    print(f"⚠️ Health check error: {str(e)}")
+                    print(f"  Waiting 30 seconds before retry...")
+                    import time
+                    time.sleep(30)
+                else:
+                    send_chat_message(f"⚠️ API is not responding: {str(e)}\n\nTip: Check if your Render service is running.")
+                    return
 
         # Try fetching all at once first, fallback to batches if timeout
         predictions_url = f"{API_BASE_URL}/predict_all_lstm"
