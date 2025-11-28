@@ -1,222 +1,148 @@
-# Indian Crypto Market Prediction System
+# Crypto Market Prediction System
 
 ## Overview
-A comprehensive cryptocurrency prediction system adapted for the Indian market using WazirX INR trading pairs. The system combines LSTM neural networks, Prophet time series forecasting, and machine learning classifiers to predict price movements and generate trading signals.
+A comprehensive cryptocurrency prediction system that forecasts prices for major USDT trading pairs. The system combines **LSTM neural networks**, **Prophet time series forecasting**, and **XGBoost classifiers** to predict price movements and generate trading signals. It uses the **Binance API** for historical and real-time data and sends alerts via **Google Chat**.
 
 ## Key Features
-- **Indian Market Focus**: Uses WazirX API for INR trading pairs
-- **Multi-Model Approach**: LSTM + Prophet + Classifier ensemble
-- **Real-time Monitoring**: WebSocket integration for live price tracking
-- **Telegram Alerts**: Automated signal notifications
-- **Accuracy Tracking**: Performance monitoring and evaluation
-- **Top 20 Cryptocurrencies**: Covers major coins in Indian market
+- **Binance Integration**: Uses Binance API for USDT trading pairs.
+- **Multi-Model Ensemble**: Combines LSTM (Price), Prophet (Trend), and XGBoost (Direction) for robust predictions.
+- **Real-time Monitoring**: WebSocket integration for live price tracking and instant alerts.
+- **Sentiment Analysis**: Incorporates news sentiment to adjust confidence scores.
+- **Google Chat Alerts**: Automated signal notifications and daily reports.
+- **Database Logging**: Stores predictions in MongoDB for historical analysis.
 
-## Supported Cryptocurrencies (INR Pairs)
-- Bitcoin (BTCINR)
-- Ethereum (ETHINR)
-- Binance Coin (BNBINR)
-- Solana (SOLINR)
-- Ripple (XRPINR)
-- Cardano (ADAINR)
-- Dogecoin (DOGEINR)
-- Avalanche (AVXINR)
-- Shiba Inu (SHIBINR)
-- Polkadot (DOTINR)
-- Polygon (MATICINR)
-- Tron (TRXINR)
-- Chainlink (LINKINR)
-- Litecoin (LTCINR)
-- Uniswap (UNIINR)
-- Bitcoin Cash (BCHINR)
-- Stellar (XLMINR)
-- Near Protocol (NEARINR)
-- Internet Computer (ICPINR)
-- Aptos (APTINR)
+## Supported Cryptocurrencies (USDT Pairs)
+The system supports the following 20 cryptocurrencies:
+- Bitcoin (BTCUSDT)
+- Ethereum (ETHUSDT)
+- Binance Coin (BNBUSDT)
+- Solana (SOLUSDT)
+- Ripple (XRPUSDT)
+- Cardano (ADAUSDT)
+- Dogecoin (DOGEUSDT)
+- Avalanche (AVAXUSDT)
+- Shiba Inu (SHIBUSDT)
+- Polkadot (DOTUSDT)
+- Polygon (MATICUSDT)
+- Tron (TRXUSDT)
+- Chainlink (LINKUSDT)
+- Litecoin (LTCUSDT)
+- Uniswap (UNIUSDT)
+- Bitcoin Cash (BCHUSDT)
+- Stellar (XLMUSDT)
+- Near Protocol (NEARUSDT)
+- Internet Computer (ICPUSDT)
+- Aptos (APTUSDT)
 
 ## Installation & Setup
 
 ### 1. Dependencies
+Install the required Python packages:
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 2. Environment Configuration
-Create a `.env` file:
-```
-TELEGRAM_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
+Create a `.env` file in the root directory with the following variables:
+```ini
+# Google Chat Webhook for notifications
+GOOGLE_CHAT_WEBHOOK_URL=your_google_chat_webhook_url
+
+# MongoDB URI for storing predictions
+MONGO_URI=your_mongodb_connection_string
+
+# Optional: Port for the API (default is 5050)
+PORT=5050
 ```
 
 ### 3. Model Training
+Before running the API, you must train the models. This script fetches data from Binance and trains LSTM, Prophet, and Classifier models for all supported coins.
 ```bash
-python train_20_lstm.py
+python train_model.py
 ```
-This will train LSTM models for all 20 supported cryptocurrencies using WazirX historical data.
+*Note: This process may take some time as it fetches historical data and trains multiple models for each coin.*
 
 ### 4. Start the API Server
+Start the Flask API to serve predictions:
 ```bash
 python predictor_api.py
 ```
-API will be available at `http://localhost:5050`
+The API will be available at `http://localhost:5050`.
 
-### 5. Start Accuracy Monitoring
-```bash
-python accuracy_tracker.py
-```
-Runs hourly accuracy checks and sends reports via Telegram.
-
-### 6. Real-time Monitoring (Optional)
+### 5. Real-time Monitoring (Optional)
+To monitor live price changes and trigger predictions automatically based on market movement:
 ```bash
 python realtime_ws_predictor.py
 ```
-Monitors live price changes and triggers predictions automatically.
 
 ## API Endpoints
 
 ### Get All Predictions
-```
+```http
 GET /predict_all_lstm
 ```
-Returns predictions for all 20 supported cryptocurrencies.
+Returns predictions for all supported cryptocurrencies.
 
 ### Get Single Prediction
-```
+```http
 GET /predict?coin=bitcoin
 ```
 Returns prediction for a specific cryptocurrency.
+**Parameters:**
+- `coin`: The name of the coin (e.g., `bitcoin`, `ethereum`, `solana`).
+
+### Send Report to Google Chat
+```http
+POST /send-to-chat
+```
+Triggers the bot to send a comprehensive prediction report to the configured Google Chat webhook.
 
 ### Health Check
-```
+```http
 GET /health
 ```
 Checks if the API is running.
 
 ### Model Status
-```
+```http
 GET /models/status
 ```
-Shows the status of all trained models.
+Shows the status of trained models for each coin.
 
 ## Architecture
 
 ### Data Flow
-1. **Data Collection**: Fetches historical price data from WazirX API
-2. **Feature Engineering**: Calculates RSI, EMA, momentum, and other technical indicators
-3. **Model Training**: Trains LSTM, Prophet, and classifier models
-4. **Prediction**: Combines multiple model outputs for final prediction
-5. **Signal Generation**: Generates BUY/SELL signals based on predictions
-6. **Monitoring**: Tracks prediction accuracy over time
-
-### Model Ensemble
-- **LSTM (60%)**: Primary neural network for price prediction
-- **Prophet (40%)**: Time series forecasting for trend analysis
-- **Classifier**: Provides success probability for signals
-
-## Key Improvements for Indian Market
-
-### 1. API Migration
-- **From**: Binance USD pairs
-- **To**: WazirX INR pairs
-- **Benefit**: Direct INR trading without currency conversion
-
-### 2. Market-Specific Features
-- Adapted to Indian trading hours and patterns
-- INR-denominated price predictions
-- Local market volatility considerations
-
-### 3. Enhanced Symbol Mapping
-```python
-COIN_ID_MAP_INR = {
-    "btcinr": "bitcoin",
-    "ethinr": "ethereum",
-    # ... complete mapping for Indian pairs
-}
-```
+1.  **Data Collection**: Fetches historical k-lines (candlestick data) from **Binance API**.
+2.  **Feature Engineering**: Calculates RSI, EMA, MACD, Bollinger Bands, and other technical indicators.
+3.  **Model Training**:
+    *   **LSTM**: Predicts the exact future price based on sequence data.
+    *   **Prophet**: Forecasts the general trend.
+    *   **XGBoost Classifier**: Predicts the probability of the price going UP or DOWN.
+4.  **Prediction**: The API aggregates these outputs.
+    *   *Final Prediction* = 60% LSTM + 40% Prophet.
+    *   *Confidence Score*: Adjusted based on the agreement between models and **Sentiment Analysis** (via Google News).
+5.  **Notification**: Signals are sent to Google Chat.
 
 ## File Structure
 ```
-├── models/                 # Trained model files
-│   ├── btcinr_lstm_model.h5
-│   ├── btcinr_classifier.pkl
-│   └── btcinrscaler.pkl
-├── predictor_api.py        # Main API server
-├── train_20_lstm.py        # Model training script
-├── accuracy_tracker.py     # Performance monitoring
-├── realtime_ws_predictor.py # Live monitoring
-├── requirements.txt        # Dependencies
-└── prediction_log.csv      # Prediction history
+├── models/                 # Directory containing trained model files (.h5, .pkl)
+├── predictor_api.py        # Main Flask API server
+├── train_model.py          # Script to fetch data and train all models
+├── gchat_bot.py            # Logic for formatting and sending Google Chat messages
+├── realtime_ws_predictor.py # WebSocket client for real-time Binance monitoring
+├── sentiment_analyzer.py   # Module for fetching and analyzing crypto news sentiment
+├── db_manager.py           # MongoDB interaction layer
+├── requirements.txt        # Python dependencies
+└── README.md               # Project documentation
 ```
-
-## Usage Examples
-
-### Manual Prediction
-```bash
-curl "http://localhost:5050/predict?coin=bitcoin"
-```
-
-### Batch Predictions
-```bash
-curl "http://localhost:5050/predict_all_lstm"
-```
-
-### Check Model Status
-```bash
-curl "http://localhost:5050/models/status"
-```
-
-## Monitoring & Alerts
-
-### Telegram Integration
-- Real-time trading signals
-- Accuracy reports every hour
-- Model performance summaries
-
-### Accuracy Tracking
-- Evaluates last 20 predictions
-- 60-minute lookahead validation
-- Automated performance reporting
-
-## Best Practices
-
-### 1. Model Retraining
-- Retrain models weekly with fresh data
-- Monitor accuracy degradation
-- Update features based on market conditions
-
-### 2. Risk Management
-- Use predictions as one factor in trading decisions
-- Implement position sizing based on confidence scores
-- Set stop-loss orders for risk control
-
-### 3. Data Quality
-- Validate API responses before processing
-- Handle missing data gracefully
-- Monitor for data anomalies
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Model Files Missing**: Run `train_20_lstm.py` first
-2. **API Timeouts**: Check WazirX API status
-3. **Telegram Not Working**: Verify bot token and chat ID
-4. **Low Accuracy**: Retrain models with more recent data
-
-### Debug Mode
-Set `debug=True` in Flask app for detailed error logging.
-
-## Future Enhancements
-
-### Planned Features
-- Advanced technical indicators
-- Sentiment analysis integration
-- Portfolio optimization
-- Mobile app development
-- Paper trading simulation
-
-### Market Expansion
-- Add more Indian exchange integrations
-- Support for futures and options
-- Regional crypto regulations compliance
+1.  **"Missing files" in Model Status**: Ensure you have run `python train_model.py` successfully.
+2.  **API Connection Failed**: Check if `predictor_api.py` is running and the port (default 5050) is not blocked.
+3.  **Google Chat Errors**: Verify your `GOOGLE_CHAT_WEBHOOK_URL` in the `.env` file.
+4.  **MongoDB Errors**: Ensure `MONGO_URI` is correct and your IP is whitelisted if using a cloud database.
 
 ## Disclaimer
-This system is for educational and research purposes. Cryptocurrency trading involves significant risk. Always conduct your own research and consider consulting with financial advisors before making investment decisions.
+This system is for educational and research purposes only. Cryptocurrency trading involves significant risk. Always conduct your own research before making investment decisions.

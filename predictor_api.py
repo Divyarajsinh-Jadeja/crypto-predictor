@@ -245,9 +245,9 @@ def model_status():
     status = {}
     for coin, symbol in SYMBOL_MAP.items():
         try:
-            lstm_model = f"models/{symbol}.h5"
-            clf_model = f"models/clf_{symbol}.pkl"
-            scaler = f"models/scaler_{symbol}.pkl"
+            lstm_model = f"models/{symbol}_lstm_model.h5"
+            clf_model = f"models/{symbol}_classifier.pkl"
+            scaler = f"models/{symbol}scaler.pkl"
             all_exist = all(os.path.exists(p) for p in [lstm_model, clf_model, scaler])
             status[coin] = "✅ Ready" if all_exist else "❌ Missing files"
         except:
