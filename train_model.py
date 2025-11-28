@@ -14,6 +14,7 @@ import pickle
 import warnings
 import time
 from datetime import datetime, timedelta
+from db_manager import save_historical_data_to_db  # Import caching function
 
 warnings.filterwarnings('ignore')
 
@@ -341,6 +342,10 @@ def train_all_models():
             continue
         
         print(f"✅ Fetched {len(df)} days (~{len(df)/365:.1f} years) of data for {symbol}")
+        
+        # ✅ Save fetched data to MongoDB cache for future predictions
+        print(f"💾 Saving {symbol} data to MongoDB cache...")
+        save_historical_data_to_db(symbol, df)
         
         df = add_features(df)
         if len(df) < 60:

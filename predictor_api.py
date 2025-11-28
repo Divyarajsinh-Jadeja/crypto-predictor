@@ -12,8 +12,15 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from tensorflow.keras.models import load_model
 from train_model import add_features, compute_confidence, fetch_klines
 import warnings
-from db_manager import log_prediction_to_db
+from db_manager import (
+    log_prediction_to_db,
+    get_historical_data_from_db,
+    get_last_cached_timestamp,
+    update_recent_data_in_cache
+)
 from sentiment_analyzer import get_crypto_sentiment, adjust_confidence_with_sentiment
+import time
+from datetime import datetime, timedelta
 
 warnings.filterwarnings('ignore')
 
@@ -255,21 +262,70 @@ def model_status():
     return jsonify(status)
 
 def run_prediction(symbol, live_price=None):
-    """Reusable prediction logic for WebSocket or batch jobs"""
+    """Reusable prediction logic for WebSocket or batch jobs with MongoDB caching"""
     try:
         has_required, optional_models = check_model_files(symbol)
         if not has_required:
             return {"symbol": symbol, "error": "Required model files not found"}
 
-        # For predictions, only fetch recent data (200 days) instead of 5 years
-        # This is much faster and less prone to failures
-        df = fetch_klines(symbol, days=200)
+        # ✅ Step 1: Try to get data from MongoDB cache first
+        print(f"📦 Checking MongoDB cache for {symbol}...")
+        df = get_historical_data_from_db(symbol)
+        
+        # ✅ Step 2: Check if cache is recent (within last 2 days)
+        cache_is_recent = False
+        if df is not None and len(df) > 0:
+            last_timestamp = get_last_cached_timestamp(symbol)
+            if last_timestamp:
+                # Check if last cached data is within last 2 days
+                two_days_ago = int((datetime.now() - timedelta(days=2)).timestamp() * 1000)
+                cache_is_recent = last_timestamp >= two_days_ago
+                
+                if cache_is_recent:
+                    print(f"✅ Using cached data for {symbol} ({len(df)} records, last update: {datetime.fromtimestamp(last_timestamp/1000)})")
+                else:
+                    print(f"⚠️ Cache for {symbol} is outdated (last update: {datetime.fromtimestamp(last_timestamp/1000)}), fetching recent data...")
+        
+        # ✅ Step 3: If cache is missing or old, fetch only last 2 days from Binance
+        if df is None or not cache_is_recent:
+            print(f"📡 Fetching last 2 days of data for {symbol} from Binance...")
+            recent_df = fetch_klines(symbol, days=2)
+            
+            if recent_df is None or len(recent_df) == 0:
+                # If we have cached data, use it even if it's old
+                if df is not None and len(df) >= 60:
+                    print(f"⚠️ Failed to fetch recent data, using cached data for {symbol}")
+                else:
+                    # No cache and fetch failed - try fetching more days as fallback
+                    print(f"⚠️ Cache unavailable and recent fetch failed, trying 200 days fallback...")
+                    df = fetch_klines(symbol, days=200)
+                    if df is None or len(df) < 60:
+                        return {"symbol": symbol, "error": "Insufficient data"}
+                # Skip to feature engineering
+            else:
+                # ✅ Step 4: Merge recent data with cached data
+                if df is not None and len(df) > 0:
+                    # Remove duplicates and merge
+                    print(f"🔄 Merging {len(recent_df)} recent records with {len(df)} cached records...")
+                    # Combine dataframes
+                    combined_df = pd.concat([df, recent_df], ignore_index=True)
+                    # Remove duplicates based on timestamp
+                    combined_df = combined_df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+                    df = combined_df
+                    print(f"✅ Combined data: {len(df)} total records")
+                    
+                    # ✅ Step 5: Update cache with recent data
+                    update_recent_data_in_cache(symbol, recent_df)
+                else:
+                    # No cache exists, use recent data and save it
+                    df = recent_df
+                    print(f"💾 Saving {len(df)} records to cache (first time)...")
+                    from db_manager import save_historical_data_to_db
+                    save_historical_data_to_db(symbol, df)
+        
+        # ✅ Step 6: Validate we have enough data
         if df is None or len(df) < 60:
-            # Try with more days if initial fetch failed
-            print(f"⚠️ Initial fetch failed for {symbol}, retrying with 365 days...")
-            df = fetch_klines(symbol, days=365)
-            if df is None or len(df) < 60:
-                return {"symbol": symbol, "error": "Insufficient data"}
+            return {"symbol": symbol, "error": "Insufficient data"}
 
         df = add_features(df)
         current = float(df["close"].iloc[-1])
