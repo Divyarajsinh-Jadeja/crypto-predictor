@@ -193,19 +193,45 @@ def train_prophet(df, symbol):
         print(f"❌ Prophet training failed for {symbol}: {e}")
         return False
 
-def fetch_klines(symbol="BTCUSDT", interval="1d", years=5, batch_limit=1000, max_retries=3):
-    """Fetch historical price data from Binance API for multiple years in batches"""
+def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_limit=1000, max_retries=3):
+    """Fetch historical price data from Binance API
+    
+    Args:
+        symbol: Trading pair symbol (e.g., "BTCUSDT")
+        interval: Kline interval (default: "1d")
+        years: Number of years of data to fetch (default: 3 if days not specified)
+        days: Number of days of data to fetch (takes precedence over years)
+        batch_limit: Maximum klines per API call (default: 1000)
+        max_retries: Maximum retry attempts (default: 3)
+    
+    Returns:
+        DataFrame with columns: timestamp, open, high, low, close, volume
+    """
     try:
         url = f"https://api.binance.com/api/v3/klines"
         end_time = int(time.time() * 1000)  # Current timestamp in ms
-        start_time = int((datetime.now() - timedelta(days=years*365)).timestamp() * 1000)
+        
+        # Calculate start time based on days or years
+        if days is not None:
+            start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+            time_desc = f"{days} days"
+        elif years is not None:
+            start_time = int((datetime.now() - timedelta(days=years*365)).timestamp() * 1000)
+            time_desc = f"{years} years"
+        else:
+            # Default to 3 years (minimum required for training) if neither specified
+            start_time = int((datetime.now() - timedelta(days=3*365)).timestamp() * 1000)
+            time_desc = "3 years"
+        
         all_data = []
         batch_count = 0
+        data = None  # Initialize to avoid NameError
 
-        print(f"📡 Fetching {years} years of data for {symbol} in batches...")
+        print(f"📡 Fetching {time_desc} of data for {symbol} in batches...")
 
         while start_time < end_time:
             retries = 0
+            batch_success = False
             while retries < max_retries:
                 try:
                     params = {
@@ -215,27 +241,44 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=5, batch_limit=1000, max
                         "startTime": start_time,
                         "endTime": end_time
                     }
-                    response = requests.get(url, params=params, timeout=10)
+                    response = requests.get(url, params=params, timeout=30)  # Increased timeout
                     response.raise_for_status()
                     data = response.json()
                     if not data:
                         print(f"ℹ️ No more data available for {symbol}")
+                        batch_success = True
                         break
                     all_data.extend(data)
                     start_time = int(data[-1][0]) + 1
                     batch_count += 1
                     print(f"✅ Fetched batch {batch_count} with {len(data)} klines")
                     time.sleep(0.2)  # Avoid rate limiting
+                    batch_success = True
                     break
+                except requests.exceptions.Timeout:
+                    retries += 1
+                    if retries == max_retries:
+                        print(f"❌ Timeout fetching batch for {symbol} after {max_retries} retries")
+                        # Return partial data if we have at least 60 rows
+                        if len(all_data) >= 60:
+                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to timeout")
+                            break
+                        return None
+                    print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: Timeout")
+                    time.sleep(2 ** retries)  # Exponential backoff
                 except Exception as e:
                     retries += 1
                     if retries == max_retries:
                         print(f"❌ Failed to fetch batch for {symbol} after {max_retries} retries: {e}")
+                        # Return partial data if we have at least 60 rows
+                        if len(all_data) >= 60:
+                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to error")
+                            break
                         return None
                     print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: {e}")
                     time.sleep(2 ** retries)  # Exponential backoff
 
-            if not data:
+            if not batch_success or not data:
                 break
 
         if not all_data:
@@ -251,11 +294,17 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=5, batch_limit=1000, max
         df["timestamp"] = df["timestamp"].astype(int)
         df = df[["timestamp", "open", "high", "low", "close", "volume"]]
         df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
-        print(f"✅ Total {len(df)} klines fetched for {symbol} (~{len(df)/365:.1f} years)")
+        
+        if days:
+            print(f"✅ Total {len(df)} klines fetched for {symbol} (~{len(df)} days)")
+        else:
+            print(f"✅ Total {len(df)} klines fetched for {symbol} (~{len(df)/365:.1f} years)")
         return df
 
     except Exception as e:
         print(f"❌ Failed to fetch data for {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def compute_confidence(current, predicted):
@@ -270,18 +319,34 @@ def compute_confidence(current, predicted):
         return 0
 
 def train_all_models():
-    """Train all models for all supported cryptocurrencies"""
+    """Train all models for all supported cryptocurrencies with minimum 3 years of data"""
     print("🚀 Starting model training for all cryptocurrencies...")
+    print("📊 Minimum requirement: 3 years (1095 days) of historical data")
+    
+    MIN_TRAINING_DAYS = 3 * 365  # Minimum 3 years = 1095 days
+    
     for symbol, coin_id in COIN_ID_MAP.items():
         print(f"\n📊 Processing {symbol} ({coin_id})...")
-        df = fetch_klines(symbol)  # Removed limit parameter
-        if df is None or len(df) < 100:
-            print(f"⚠️ Insufficient data for {symbol}, skipping...")
+        
+        # Fetch minimum 3 years of data for training
+        df = fetch_klines(symbol, years=3)
+        
+        if df is None:
+            print(f"❌ Failed to fetch data for {symbol}, skipping...")
             continue
+        
+        # Validate minimum 3 years of data
+        if len(df) < MIN_TRAINING_DAYS:
+            print(f"⚠️ Insufficient data for {symbol}: {len(df)} days (minimum {MIN_TRAINING_DAYS} days required), skipping...")
+            continue
+        
+        print(f"✅ Fetched {len(df)} days (~{len(df)/365:.1f} years) of data for {symbol}")
+        
         df = add_features(df)
         if len(df) < 60:
             print(f"⚠️ Not enough data after feature engineering for {symbol}, skipping...")
             continue
+        
         lstm_success = train_lstm(df, symbol)
         classifier_success = train_classifier(df, symbol)
         prophet_success = train_prophet(df, symbol)

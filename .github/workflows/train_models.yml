@@ -8,7 +8,7 @@ on:
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 120 # 2 hour timeout for training all models
+    timeout-minutes: 120 # 2 hour timeout for training all models (3 years of data per coin)
 
     steps:
       - name: Checkout code
@@ -25,10 +25,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create models directory
+        run: mkdir -p models
+
       - name: Train All Models
-        run: python train_model.py
+        run: |
+          echo "🚀 Starting model training with minimum 3 years of data per coin..."
+          python train_model.py
         env:
           TF_CPP_MIN_LOG_LEVEL: "2"
+
+      - name: Verify Models Created
+        run: |
+          echo "📊 Verifying trained models..."
+          MODEL_COUNT=$(find models -name "*.h5" -o -name "*_classifier.pkl" -o -name "*_prophet.pkl" | wc -l)
+          echo "✅ Found $MODEL_COUNT model files"
+          if [ $MODEL_COUNT -lt 20 ]; then
+            echo "⚠️ Warning: Expected at least 20 model files (some coins may have been skipped)"
+          fi
 
       - name: Upload Models as Artifacts
         uses: actions/upload-artifact@v4

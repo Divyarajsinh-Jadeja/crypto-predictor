@@ -261,9 +261,15 @@ def run_prediction(symbol, live_price=None):
         if not has_required:
             return {"symbol": symbol, "error": "Required model files not found"}
 
-        df = fetch_klines(symbol)
+        # For predictions, only fetch recent data (200 days) instead of 5 years
+        # This is much faster and less prone to failures
+        df = fetch_klines(symbol, days=200)
         if df is None or len(df) < 60:
-            return {"symbol": symbol, "error": "Insufficient data"}
+            # Try with more days if initial fetch failed
+            print(f"⚠️ Initial fetch failed for {symbol}, retrying with 365 days...")
+            df = fetch_klines(symbol, days=365)
+            if df is None or len(df) < 60:
+                return {"symbol": symbol, "error": "Insufficient data"}
 
         df = add_features(df)
         current = float(df["close"].iloc[-1])
