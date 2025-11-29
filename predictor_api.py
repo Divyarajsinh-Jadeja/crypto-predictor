@@ -322,13 +322,13 @@ def run_prediction(symbol, live_price=None):
                 else:
                     # No cache and fetch failed - try smaller fallback (60 days minimum for LSTM)
                     print(f"⚠️ Cache unavailable and recent fetch failed, trying 60 days fallback...")
-                    df = fetch_klines(symbol, days=60)
+                    try:
+                        df = fetch_klines(symbol, days=60)
+                    except Exception as e:
+                        return {"symbol": symbol, "error": f"Fetch failed: {str(e)}"}
+                        
                     if df is None or len(df) < 60:
-                        # Last resort: try 100 days
-                        print(f"⚠️ 60 days failed, trying 100 days as last resort...")
-                        df = fetch_klines(symbol, days=100)
-                        if df is None or len(df) < 60:
-                            return {"symbol": symbol, "error": "Insufficient data - unable to fetch from Binance API"}
+                        return {"symbol": symbol, "error": "Insufficient data - unable to fetch from any Binance URL"}
                 # Skip to feature engineering
             else:
                 # ✅ Step 4: Merge recent data with cached data
