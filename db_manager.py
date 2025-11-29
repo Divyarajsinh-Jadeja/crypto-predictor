@@ -232,3 +232,134 @@ def update_recent_data_in_cache(symbol, df):
     except Exception as e:
         print(f"❌ Failed to update recent data for {symbol}: {e}")
         return False
+
+# ========== MongoDB Setup & Initialization ==========
+
+def setup_mongodb_indexes():
+    """Create indexes for optimal query performance
+    
+    This should be run once after MongoDB setup to optimize queries.
+    Creates indexes on:
+    - historical_data: {symbol: 1, timestamp: 1} (compound index)
+    - predictions: {symbol: 1, timestamp: -1} (for recent predictions)
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    db = get_db_connection()
+    if db is None:
+        print("⚠️ Cannot setup indexes: MongoDB not connected")
+        return False
+    
+    try:
+        # Setup indexes for historical_data collection
+        historical_collection = db[HISTORICAL_DATA_COLLECTION]
+        
+        # Compound index for fast queries by symbol and timestamp
+        historical_collection.create_index(
+            [("symbol", 1), ("timestamp", 1)],
+            name="symbol_timestamp_idx",
+            background=True
+        )
+        print("✅ Created index on historical_data: symbol + timestamp")
+        
+        # Index on updated_at for cache freshness checks
+        historical_collection.create_index(
+            [("updated_at", -1)],
+            name="updated_at_idx",
+            background=True
+        )
+        print("✅ Created index on historical_data: updated_at")
+        
+        # Setup indexes for predictions collection
+        predictions_collection = db[COLLECTION_NAME]
+        
+        # Index for querying recent predictions by symbol
+        predictions_collection.create_index(
+            [("symbol", 1), ("timestamp", -1)],
+            name="symbol_timestamp_idx",
+            background=True
+        )
+        print("✅ Created index on predictions: symbol + timestamp")
+        
+        print("🎉 MongoDB indexes setup complete!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to setup MongoDB indexes: {e}")
+        return False
+
+def verify_mongodb_connection():
+    """Verify MongoDB connection and database access
+    
+    Returns:
+        dict: Connection status and database info
+    """
+    db = get_db_connection()
+    if db is None:
+        return {
+            "connected": False,
+            "error": "MONGO_URI not configured or connection failed"
+        }
+    
+    try:
+        # Test connection
+        db.client.admin.command('ping')
+        
+        # Get collection counts
+        historical_count = db[HISTORICAL_DATA_COLLECTION].count_documents({})
+        predictions_count = db[COLLECTION_NAME].count_documents({})
+        
+        # Get database stats
+        db_stats = db.command("dbStats")
+        
+        return {
+            "connected": True,
+            "database": DB_NAME,
+            "collections": {
+                "historical_data": {
+                    "count": historical_count,
+                    "collection": HISTORICAL_DATA_COLLECTION
+                },
+                "predictions": {
+                    "count": predictions_count,
+                    "collection": COLLECTION_NAME
+                }
+            },
+            "database_size_mb": round(db_stats.get("dataSize", 0) / (1024 * 1024), 2),
+            "storage_size_mb": round(db_stats.get("storageSize", 0) / (1024 * 1024), 2)
+        }
+        
+    except Exception as e:
+        return {
+            "connected": False,
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    # Run setup if executed directly
+    print("🔧 MongoDB Setup Script")
+    print("=" * 50)
+    
+    # Verify connection
+    print("\n1. Verifying MongoDB connection...")
+    status = verify_mongodb_connection()
+    if status["connected"]:
+        print("✅ MongoDB connection successful!")
+        print(f"   Database: {status['database']}")
+        print(f"   Historical data records: {status['collections']['historical_data']['count']}")
+        print(f"   Prediction records: {status['collections']['predictions']['count']}")
+        print(f"   Database size: {status['database_size_mb']} MB")
+    else:
+        print(f"❌ MongoDB connection failed: {status.get('error', 'Unknown error')}")
+        print("\n💡 Make sure MONGO_URI is set in your .env file")
+        exit(1)
+    
+    # Setup indexes
+    print("\n2. Setting up indexes...")
+    if setup_mongodb_indexes():
+        print("✅ Indexes created successfully!")
+    else:
+        print("⚠️ Some indexes may already exist (this is OK)")
+    
+    print("\n🎉 MongoDB setup complete!")

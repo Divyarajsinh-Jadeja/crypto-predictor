@@ -247,6 +247,26 @@ def health_check():
     return jsonify({"status": "ok", "message": "API is live"}), 200
 
 
+@app.route("/health/db", methods=["GET"])
+def db_health_check():
+    """Check MongoDB connection and cache status"""
+    from db_manager import verify_mongodb_connection
+    status = verify_mongodb_connection()
+    if status.get("connected"):
+        return jsonify({
+            "status": "ok",
+            "database": status.get("database"),
+            "collections": status.get("collections"),
+            "database_size_mb": status.get("database_size_mb"),
+            "storage_size_mb": status.get("storage_size_mb")
+        }), 200
+    else:
+        return jsonify({
+            "status": "error",
+            "message": status.get("error", "MongoDB connection failed")
+        }), 503
+
+
 @app.route("/models/status", methods=["GET"])
 def model_status():
     status = {}
