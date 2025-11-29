@@ -245,27 +245,41 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_l
                     response = requests.get(url, params=params, timeout=30)  # Increased timeout
                     response.raise_for_status()
                     data = response.json()
-                    response = requests.get(url, params=params, timeout=5)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if not data:
-                            break # No more data
-                        
-                        all_data.extend(data)
-                        start_time = int(data[-1][0]) + 1
-                        batch_count += 1
-                        data_fetched = True
-                        # print(f"  ✅ Batch {batch_count} fetched from {url}")
-                        break # Stop trying other URLs for this batch
-                    elif response.status_code == 451 or response.status_code == 403:
-                        # Geo-blocked or Forbidden
-                        continue # Try next URL
-                except Exception:
-                    continue # Try next URL
+                    if not data:
+                        print(f"ℹ️ No more data available for {symbol}")
+                        batch_success = True
+                        break
+                    all_data.extend(data)
+                    start_time = int(data[-1][0]) + 1
+                    batch_count += 1
+                    print(f"✅ Fetched batch {batch_count} with {len(data)} klines")
+                    time.sleep(0.2)  # Avoid rate limiting
+                    batch_success = True
+                    break
+                except requests.exceptions.Timeout:
+                    retries += 1
+                    if retries == max_retries:
+                        print(f"❌ Timeout fetching batch for {symbol} after {max_retries} retries")
+                        # Return partial data if we have at least 60 rows
+                        if len(all_data) >= 60:
+                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to timeout")
+                            break
+                        return None
+                    print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: Timeout")
+                    time.sleep(2 ** retries)  # Exponential backoff
+                except Exception as e:
+                    retries += 1
+                    if retries == max_retries:
+                        print(f"❌ Failed to fetch batch for {symbol} after {max_retries} retries: {e}")
+                        # Return partial data if we have at least 60 rows
+                        if len(all_data) >= 60:
+                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to error")
+                            break
+                        return None
+                    print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: {e}")
+                    time.sleep(2 ** retries)  # Exponential backoff
 
-            if not data_fetched:
-                print(f"❌ Failed to fetch batch for {symbol} from all sources.")
+            if not batch_success or not data:
                 break
                 
             # Rate limit safety
