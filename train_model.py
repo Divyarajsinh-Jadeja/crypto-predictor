@@ -194,8 +194,9 @@ def train_prophet(df, symbol):
         print(f"❌ Prophet training failed for {symbol}: {e}")
         return False
 
-def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_limit=1000, max_retries=3):
-    """Fetch historical price data from Binance API
+def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, batch_limit=1000, max_retries=3, days=None):
+    """
+    Fetch historical price data from Binance API (Handles US Geo-blocking)
     
     Args:
         symbol: Trading pair symbol (e.g., "BTCUSDT")
@@ -209,7 +210,6 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_l
         DataFrame with columns: timestamp, open, high, low, close, volume
     """
     try:
-        url = f"https://api.binance.com/api/v3/klines"
         end_time = int(time.time() * 1000)  # Current timestamp in ms
         
         # Calculate start time based on days or years
@@ -226,14 +226,21 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_l
         
         all_data = []
         batch_count = 0
-        data = None  # Initialize to avoid NameError
+        
+        # List of API endpoints to try (Binance.com blocked in US, Binance.US works)
+        base_urls = [
+            "https://api.binance.com/api/v3/klines",      # Global (Blocked in US)
+            "https://api.binance.us/api/v3/klines",       # US specific (Works on Render)
+            "https://api1.binance.com/api/v3/klines",     # Backup 1
+            "https://api2.binance.com/api/v3/klines"      # Backup 2
+        ]
 
         print(f"📡 Fetching {time_desc} of data for {symbol} in batches...")
 
         while start_time < end_time:
-            retries = 0
-            batch_success = False
-            while retries < max_retries:
+            data_fetched = False
+            
+            for url in base_urls:
                 try:
                     params = {
                         "symbol": symbol,
@@ -242,45 +249,38 @@ def fetch_klines(symbol="BTCUSDT", interval="1d", years=None, days=None, batch_l
                         "startTime": start_time,
                         "endTime": end_time
                     }
-                    response = requests.get(url, params=params, timeout=30)  # Increased timeout
-                    response.raise_for_status()
-                    data = response.json()
-                    if not data:
-                        print(f"ℹ️ No more data available for {symbol}")
-                        batch_success = True
-                        break
-                    all_data.extend(data)
-                    start_time = int(data[-1][0]) + 1
-                    batch_count += 1
-                    print(f"✅ Fetched batch {batch_count} with {len(data)} klines")
-                    time.sleep(0.2)  # Avoid rate limiting
-                    batch_success = True
-                    break
-                except requests.exceptions.Timeout:
-                    retries += 1
-                    if retries == max_retries:
-                        print(f"❌ Timeout fetching batch for {symbol} after {max_retries} retries")
-                        # Return partial data if we have at least 60 rows
-                        if len(all_data) >= 60:
-                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to timeout")
-                            break
-                        return None
-                    print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: Timeout")
-                    time.sleep(2 ** retries)  # Exponential backoff
-                except Exception as e:
-                    retries += 1
-                    if retries == max_retries:
-                        print(f"❌ Failed to fetch batch for {symbol} after {max_retries} retries: {e}")
-                        # Return partial data if we have at least 60 rows
-                        if len(all_data) >= 60:
-                            print(f"⚠️ Returning partial data ({len(all_data)} rows) due to error")
-                            break
-                        return None
-                    print(f"⚠️ Retry {retries}/{max_retries} for {symbol}: {e}")
-                    time.sleep(2 ** retries)  # Exponential backoff
+                    # Short timeout for checking connectivity
+                    response = requests.get(url, params=params, timeout=5)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if not data:
+                            # No more data available
+                            data_fetched = True
+                            start_time = end_time + 1 # Break outer loop
+                            break 
+                        
+                        all_data.extend(data)
+                        start_time = int(data[-1][0]) + 1
+                        batch_count += 1
+                        data_fetched = True
+                        # print(f"  ✅ Batch {batch_count} fetched from {url}")
+                        break # Stop trying other URLs for this batch, move to next batch
+                    elif response.status_code in [403, 451]:
+                        # Geo-blocked or Forbidden - silently try next URL
+                        continue
+                except Exception:
+                    # Connection error - silently try next URL
+                    continue
 
-            if not batch_success or not data:
-                break
+            if not data_fetched:
+                # If we couldn't fetch data from ANY url for this batch
+                if len(all_data) > 0:
+                    print(f"⚠️ Partial data fetched for {symbol} ({len(all_data)} rows). Stopping early.")
+                    break
+                else:
+                    print(f"❌ Failed to fetch any data for {symbol} from all sources.")
+                    return None
                 
             # Rate limit safety
             time.sleep(0.1)
